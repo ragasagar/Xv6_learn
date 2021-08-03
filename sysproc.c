@@ -89,3 +89,26 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+//Implement a system call to print “Hello World\n” to the console.
+int 
+sys_helloWorld(void){
+  cprintf("Hello World!\n");
+  return 1;
+}
+
+//Reports the number of open file descriptors used by the current process
+int 
+sys_numOpenFiles(void){
+    return numOpenFiles();
+}
+
+int
+sys_memAlloc(void){
+  return memAlloc();
+}
+
+int
+sys_getprocesstimedetails(){
+  return getprocesstimedetails();
+}

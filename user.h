@@ -23,6 +23,10 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int helloWorld(void);
+int numOpenFiles(void);
+int memAlloc(void);
+int getprocesstimedetails(void);
 
 // ulib.c
 int stat(const char*, struct stat*);
