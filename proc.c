@@ -6,7 +6,6 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
-#include "date.h"
 
 struct {
   struct spinlock lock;
@@ -89,9 +88,11 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->hz=0;      //inital heapsize usage of a process.
 
   release(&ptable.lock);
 
+  cmostime(&p->cdt);
   // Allocate kernel stack.
   if((p->kstack = kalloc()) == 0){
     p->state = UNUSED;
@@ -161,7 +162,6 @@ growproc(int n)
 {
   uint sz;
   struct proc *curproc = myproc();
-
   sz = curproc->sz;
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
@@ -170,6 +170,7 @@ growproc(int n)
     if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
   }
+  curproc->hz +=n;
   curproc->sz = sz;
   switchuvm(curproc);
   return 0;
@@ -339,14 +340,14 @@ scheduler(void)
 
 
       //Sets the switched in time for the process
-      // cmostime(p->lastContextSwitchedInDateTime);
+      cmostime(&p->lscindt);
+
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
-
       swtch(&(c->scheduler), p->context);
       switchkvm();
 
@@ -371,8 +372,7 @@ sched(void)
 {
   int intena;
   struct proc *p = myproc();
-  //Sets  the last swithched out time
-  // cmostime(p->lastContextSwitchedOutDateTime);
+  cmostime(&p->lcsoutdt);
   if(!holding(&ptable.lock))
     panic("sched ptable.lock");
   if(mycpu()->ncli != 1)
@@ -382,7 +382,6 @@ sched(void)
   if(readeflags()&FL_IF)
     panic("sched interruptible");
   intena = mycpu()->intena;
-
   swtch(&p->context, mycpu()->scheduler);
   mycpu()->intena = intena;
 }
@@ -554,27 +553,30 @@ numOpenFiles(void){
 
 int
 memAlloc(){
-  struct proc *p = myproc();
-  return p->sz;
+  return myproc()->hz;
 }
 
 
 int
 getprocesstimedetails(){
   struct proc *p = myproc();
-  struct rtcdate *createdDateTime = p->createdDateTime;
-  cprintf("processCreationDateTime: %d : %d : %d : %d : %d : %d \n", createdDateTime->second, createdDateTime->minute, 
-  createdDateTime->hour, createdDateTime->month, createdDateTime->day);
-  if(p->lastContextSwitchedOutDateTime){
-    struct rtcdate *switchOutDateTime = p->lastContextSwitchedOutDateTime;
-    cprintf("processLastContextSwitchedOutDateTime: %d : %d : %d : %d : %d : %d \n", switchOutDateTime->second, switchOutDateTime->minute, 
-    switchOutDateTime->hour, switchOutDateTime->month, switchOutDateTime->day);
-  }else{
-    cprintf("processCreationDateTime: %d : %d : %d : %d : %d : %d \n", createdDateTime->second, createdDateTime->minute, 
-    createdDateTime->hour, createdDateTime->month, createdDateTime->day);
+  if(&p->cdt || &p->lscindt || &p->lcsoutdt){
+    struct rtcdate *createdDateTime = &p->cdt;
+    cprintf("\nprocessCreationDateTime: <%d> : <%d> : <%d> : <%d> : <%d> : <%d>", createdDateTime->second, createdDateTime->minute, 
+    createdDateTime->hour, createdDateTime->month, createdDateTime->day, createdDateTime->year);
+      struct rtcdate *switchOutDateTime = &p->lcsoutdt;
+    if(switchOutDateTime){
+      cprintf("\nprocessLastContextSwitchedOutDateTime: <%d> : <%d> : <%d> : <%d> : <%d> : <%d>", switchOutDateTime->second, switchOutDateTime->minute, 
+      switchOutDateTime->hour, switchOutDateTime->month, switchOutDateTime->day, createdDateTime->year);
+    }else{
+      cprintf("\nprocessLastContextSwitchedOutDateTime: <%d> : <%d> : <%d> : <%d> : <%d> : <%d>", createdDateTime->second, createdDateTime->minute, 
+      createdDateTime->hour, createdDateTime->month, createdDateTime->day, createdDateTime->year);
+    }
+    struct rtcdate *switchInDateTime = &p->lscindt;
+    cprintf("\nprocessLastContextSwitchedInDateTime: <%d> : <%d> : <%d> : <%d> : <%d> : <%d>", switchInDateTime->second, switchInDateTime->minute, 
+    switchInDateTime->hour, switchInDateTime->month, switchInDateTime->day, switchInDateTime->year);
+    cprintf("\n");
+    return 1;
   }
-  struct rtcdate *switchInDateTime = p->lastContextSwitchedInDateTime;
-  cprintf("processLastContextSwitchedOutDateTime: %d : %d : %d : %d : %d : %d \n", switchInDateTime->second, switchInDateTime->minute, 
-  switchInDateTime->hour, switchInDateTime->month, switchInDateTime->day);
-  return 1;
+  return -1;
 }

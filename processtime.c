@@ -5,5 +5,26 @@
 
 int main(int argc, char *argv[]){
     getprocesstimedetails();
+    sleep(2000);
+    int i = fork();
+    if(i>1){
+        int j = fork();
+        if(j>1){
+            printf(1,"Hello parent");
+            sleep(2000);
+            getprocesstimedetails();
+            wait();
+            getprocesstimedetails();
+
+        }
+        printf(1,"\nparent task");
+        getprocesstimedetails();
+        wait();
+        printf(1,"\nparent task-->2 after waiting");
+        getprocesstimedetails();
+    }
+    printf(1,"\nchild task");
+    sleep(1000);
+    getprocesstimedetails();
     exit();
 }
