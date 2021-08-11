@@ -55,6 +55,7 @@ struct proc {
   struct rtcdate cdt; // Process created Date
   struct rtcdate lcsoutdt; //Process switched out date
   struct rtcdate lscindt;  // Process switched in date
+  int status;               // Status of the process.
 };
 
 // Process memory is laid out contiguously, low addresses first:

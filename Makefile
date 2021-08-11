@@ -185,6 +185,9 @@ UPROGS=\
 	_ofiles\
 	_memalloc\
 	_processtime\
+	_shell\
+	_ps\
+	_procinfo\
 
 
 fs.img: mkfs README $(UPROGS)

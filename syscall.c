@@ -107,6 +107,8 @@ extern int sys_helloWorld(void);
 extern int sys_numOpenFiles(void);
 extern int sys_memAlloc(void);
 extern int sys_getprocesstimedetails(void);
+extern int sys_psinfo(void);
+extern int sys_procinfo(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -134,6 +136,8 @@ static int (*syscalls[])(void) = {
 [SYS_numOpenFiles]   sys_numOpenFiles,
 [SYS_memAlloc]       sys_memAlloc,
 [SYS_getprocesstimedetails]     sys_getprocesstimedetails,
+[SYS_psinfo]          sys_psinfo,
+[SYS_procinfo]         sys_procinfo,
 };
 
 void

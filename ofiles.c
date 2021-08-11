@@ -87,5 +87,5 @@ int main(int argc, char *argv[])
   
   if(fd6 >0)
    close(fd1);
- exit();
+ exit(0);
 }

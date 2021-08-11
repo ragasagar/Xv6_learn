@@ -13,18 +13,18 @@ int main(int argc, char *argv[]){
             printf(1,"Hello parent");
             sleep(2000);
             getprocesstimedetails();
-            wait();
+            wait(0);
             getprocesstimedetails();
 
         }
         printf(1,"\nparent task");
         getprocesstimedetails();
-        wait();
+        wait(0);
         printf(1,"\nparent task-->2 after waiting");
         getprocesstimedetails();
     }
     printf(1,"\nchild task");
     sleep(1000);
     getprocesstimedetails();
-    exit();
+    exit(0);
 }

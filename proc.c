@@ -225,9 +225,9 @@ fork(void)
 
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
-// until its parent calls wait() to find out it exited.
+// until its parent calls wait(0) to find out it exited.
 void
-exit(void)
+exit(int status)
 {
   struct proc *curproc = myproc();
   struct proc *p;
@@ -251,7 +251,7 @@ exit(void)
 
   acquire(&ptable.lock);
 
-  // Parent might be sleeping in wait().
+  // Parent might be sleeping in wait(0).
   wakeup1(curproc->parent);
 
   // Pass abandoned children to init.
@@ -265,6 +265,8 @@ exit(void)
 
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
+
+  curproc->status = status;
   sched();
   panic("zombie exit");
 }
@@ -272,7 +274,7 @@ exit(void)
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
 int
-wait(void)
+wait(int *status)
 {
   struct proc *p;
   int havekids, pid;
@@ -298,6 +300,7 @@ wait(void)
         p->killed = 0;
         p->state = UNUSED;
         release(&ptable.lock);
+        status = &p->status;
         return pid;
       }
     }
@@ -538,45 +541,97 @@ procdump(void)
   }
 }
 
-//counts the number of files opened by the current process.
+
+// counts the number of files opened by the given process.
 int
-numOpenFiles(void){
-  struct proc *p = myproc();
-  int count = 0,i;
-  for(i = 0; i < NOFILE; i++){
-    if(p->ofile[i]){
-      count++;
+numOpenFiles(int pid){
+  struct proc *p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+      int count = 0,i;
+      for(i = 0; i < NOFILE; i++){
+        if(p->ofile[i]){
+        count++;
+      }
     }
-  }
-  return count;
-}
-
-int
-memAlloc(){
-  return myproc()->hz;
-}
-
-
-int
-getprocesstimedetails(){
-  struct proc *p = myproc();
-  if(&p->cdt || &p->lscindt || &p->lcsoutdt){
-    struct rtcdate *createdDateTime = &p->cdt;
-    cprintf("\nprocessCreationDateTime: <%d> : <%d> : <%d> : <%d> : <%d> : <%d>", createdDateTime->second, createdDateTime->minute, 
-    createdDateTime->hour, createdDateTime->month, createdDateTime->day, createdDateTime->year);
-      struct rtcdate *switchOutDateTime = &p->lcsoutdt;
-    if(switchOutDateTime){
-      cprintf("\nprocessLastContextSwitchedOutDateTime: <%d> : <%d> : <%d> : <%d> : <%d> : <%d>", switchOutDateTime->second, switchOutDateTime->minute, 
-      switchOutDateTime->hour, switchOutDateTime->month, switchOutDateTime->day, createdDateTime->year);
-    }else{
-      cprintf("\nprocessLastContextSwitchedOutDateTime: <%d> : <%d> : <%d> : <%d> : <%d> : <%d>", createdDateTime->second, createdDateTime->minute, 
-      createdDateTime->hour, createdDateTime->month, createdDateTime->day, createdDateTime->year);
+    return count;
     }
-    struct rtcdate *switchInDateTime = &p->lscindt;
-    cprintf("\nprocessLastContextSwitchedInDateTime: <%d> : <%d> : <%d> : <%d> : <%d> : <%d>", switchInDateTime->second, switchInDateTime->minute, 
-    switchInDateTime->hour, switchInDateTime->month, switchInDateTime->day, switchInDateTime->year);
-    cprintf("\n");
-    return 1;
   }
   return -1;
+}
+
+
+
+// fetch the heap memory used by the given process.
+int
+memAlloc(int pid){
+  struct proc *p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid)
+      return p->hz;
+  }
+  return -1;
+}
+
+// prints the createdtime, switchedout date time and switchedin date time of the given process.
+int
+getprocesstimedetails(int pid){
+  struct proc *p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+      struct rtcdate *createdDateTime = &p->cdt;
+      cprintf("\nprocessCreationDateTime: <%d> : <%d> : <%d> : <%d> : <%d> : <%d>", createdDateTime->second, createdDateTime->minute, 
+      createdDateTime->hour, createdDateTime->month, createdDateTime->day, createdDateTime->year);
+        struct rtcdate *switchOutDateTime = &p->lcsoutdt;
+      if(switchOutDateTime){
+        cprintf("\nprocessLastContextSwitchedOutDateTime: <%d> : <%d> : <%d> : <%d> : <%d> : <%d>", switchOutDateTime->second, switchOutDateTime->minute, 
+        switchOutDateTime->hour, switchOutDateTime->month, switchOutDateTime->day, createdDateTime->year);
+      }else{
+        cprintf("\nprocessLastContextSwitchedOutDateTime: <%d> : <%d> : <%d> : <%d> : <%d> : <%d>", createdDateTime->second, createdDateTime->minute, 
+        createdDateTime->hour, createdDateTime->month, createdDateTime->day, createdDateTime->year);
+      }
+      struct rtcdate *switchInDateTime = &p->lscindt;
+      cprintf("\nprocessLastContextSwitchedInDateTime: <%d> : <%d> : <%d> : <%d> : <%d> : <%d>", switchInDateTime->second, switchInDateTime->minute, 
+      switchInDateTime->hour, switchInDateTime->month, switchInDateTime->day, switchInDateTime->year);
+      cprintf("\n");
+      return 1;
+    }
+  }
+  return -1;
+}
+
+// method to output the pids and process states of all the processes in xv6.
+void
+psinfo(){
+
+  static char *states[] = {
+  [UNUSED]    "UNUSED",
+  [EMBRYO]    "EMBRYO",
+  [SLEEPING]  "SLEEPING ",
+  [RUNNABLE]  "RUNNABLE",
+  [RUNNING]   "RUNNING",
+  [ZOMBIE]    "ZOMBIE"
+  };
+  struct proc *p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == UNUSED)
+      continue;
+    cprintf("%s\t\t%d\t\t%s\n", p->name, p->pid, states[p->state]);
+  }
+}
+
+
+
+void
+procinfo(int pid){
+  struct proc *p;
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+      
+      cprintf("Number of files opened: %d", numOpenFiles(pid));
+      cprintf("\nMemory allocated: %d", memAlloc(pid));
+      getprocesstimedetails(pid);
+    }
+  }
 }

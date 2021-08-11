@@ -1,6 +1,11 @@
 {
     "files.associations": {
         "user.h": "c",
-        "date.h": "c"
+        "date.h": "c",
+        "cstdio": "c",
+        "*.tcc": "c",
+        "cstdlib": "c",
+        "fcntl.h": "c",
+        "typeinfo": "c"
     }
 }

@@ -15,14 +15,24 @@ sys_fork(void)
 int
 sys_exit(void)
 {
-  exit();
+  int status;
+
+  if( argint(0, &status) < 0 ){
+   return -1;
+  }
+  
+  exit(status);
   return 0;  // not reached
 }
 
 int
 sys_wait(void)
 {
-  return wait();
+  int *status;
+ if(argptr(0, (void*)&status, sizeof(int))<0){
+   return -1;
+ }
+  return wait(status);
 }
 
 int
@@ -99,15 +109,44 @@ sys_helloWorld(void){
 //Reports the number of open file descriptors used by the current process
 int 
 sys_numOpenFiles(void){
-    return numOpenFiles();
+  int pid;
+  if( argint(0, &pid) < 0 ){
+   return -1;
+ }
+    return numOpenFiles(pid);
 }
 
 int
 sys_memAlloc(void){
-  return memAlloc();
+  int pid;
+  if( argint(0, &pid) < 0 ){
+   return -1;
+ }
+  return memAlloc(pid);
 }
 
 int
 sys_getprocesstimedetails(){
-  return getprocesstimedetails();
+  int pid;
+  if( argint(0, &pid) < 0 ){
+   return -1;
+ }
+  return getprocesstimedetails(pid);
+}
+
+int
+sys_psinfo(){
+  psinfo();
+  return 1;
+}
+
+
+int
+sys_procinfo(void){
+int pid;
+  if( argint(0, &pid) < 0 ){
+   return -1;
+ }
+  procinfo(pid);
+  return 1;
 }
