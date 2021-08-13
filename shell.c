@@ -6,10 +6,16 @@
 
 
 #define MAXARGS 10
+char *validCommand[] = {"ls", "cat", "grep", "echo", "wc", "ps", "procinfo"};
 
+
+//these symbols  will be considered as white spaces.
 char whitespace[] = " \t\r\n\v";
+
+//total symbol which decides the type of the command.
 char symbols[] = "<|>&;()";
 
+//basically the command
 struct cmds{
   int type;
 };
@@ -32,13 +38,12 @@ struct command{
   int fd;
 };
 
-struct cmds *parsecmd(char*);
+struct cmds *parsecommands(char*);
 
 
 //This method checks the valid commands to run the program.
 int
 isValid(char *arg){
-  char *validCommand[] = {"ls", "cat", "grep", "echo", "wc", "ps", "procinfo"};
   char **p;
   p = validCommand;
   while(*p != 0){
@@ -56,6 +61,7 @@ runcmd(struct cmds *cmd)
   int p[2];
   struct execcommand *execcommand;
   struct command *command;
+  int status;
 
   if(cmd == 0)
     exit(0);
@@ -67,7 +73,7 @@ runcmd(struct cmds *cmd)
       break;
     if(isValid(execcommand->argv[0])){
       exec(execcommand->argv[0], execcommand->argv);
-       printf(2, "exec %s failed\n", execcommand->argv[0]);
+      printf(2, "exec %s failed\n", execcommand->argv[0]);
     }else
       printf(1, "Illegal command or arguments\n");
     break;
@@ -114,6 +120,27 @@ runcmd(struct cmds *cmd)
     wait(0);
     wait(0);
     break;
+
+    case 5:
+    command = (struct command*) cmd;
+      if(fork()==0){
+        runcmd(command->child1);
+      }
+      wait(&status);
+      if(status == 0 && fork()==0){
+        runcmd(command->child2);
+      }
+      break;
+    case 6:
+    command = (struct command*) cmd;
+      if(fork()==0){
+        runcmd(command->child1);
+      }
+      wait(&status);
+      if(status == -1 && fork()==0){
+        runcmd(command->child2);
+      }
+      break;
   }
   exit(0);
 }
@@ -148,7 +175,7 @@ main(void)
 
     //rest commands are parsed and executed using exec call.
     if(fork() == 0){
-      runcmd(parsecmd(buf));
+      runcmd(parsecommands(buf));
     }
     wait(0);
   }
@@ -162,8 +189,9 @@ struct cmds *buildcommand(struct cmds *, char **, char *);
 
 /**
  * 
- *  In this program, it uses three types of commands, normal exec, io and pipe.
-**/
+ *  In this program, it uses three types of commands, normal exec, io and pipe. basically the basic atomic 
+ * command.
+*/
 struct cmds*
 execcmd(void)
 {
@@ -175,36 +203,45 @@ execcmd(void)
   return (struct cmds*)cmd;
 }
 
+//This holds the information for redirection type of commands.
 struct cmds*
-iocommand(struct cmds *subcmd, char *file, char *efile, int mode, int fd)
+iocommand(struct cmds *child, char *mainfile, char *tempfile, int mode, int fd)
 {
   struct command *cmd;
 
   cmd = malloc(sizeof(*cmd));
   memset(cmd, 0, sizeof(*cmd));
   cmd->type = 2;
-  cmd->child1 = subcmd;
-  cmd->file = file;
-  cmd->tempfile = efile;
+  cmd->child1 = child;
+  cmd->file = mainfile;
+  cmd->tempfile = tempfile;
   cmd->mode = mode;
   cmd->fd = fd;
   return (struct cmds*)cmd;
 }
 
+
+/**
+ * this holds the information regarding pipe/parallel/&&/|| type of the command.
+ * type is used to differentiate the type of command.
+ * */
 struct cmds*
-command(struct cmds *left, struct cmds *right, int type)
+command(struct cmds *child1, struct cmds *child2, int type)
 {
   struct command *cmd;
 
   cmd = malloc(sizeof(*cmd));
   memset(cmd, 0, sizeof(*cmd));
   cmd->type = type;
-  cmd->child1 = left;
-  cmd->child2 = right;
+  cmd->child1 = child1;
+  cmd->child2 = child2;
   return (struct cmds*)cmd;
 }
 
 
+/**
+ * Checks if the next char is given toks or not.
+ **/
 int
 nextchar(char **ps, char *es, char *toks)
 {
@@ -217,20 +254,39 @@ nextchar(char **ps, char *es, char *toks)
   return *s && strchr(toks, *s);
 }
 
+/**
+ * Main parser which parse the commands.
+ * 
+ * */
 struct cmds*
-parsecmd(char *s){
+parsecommands(char *s){
   char *end;
   struct cmds *cmd;
   end = s + strlen(s);
+
+  //first we try to fetch the first exec command
   cmd = fetchexeccommand(&s, end);
+
+
   if(nextchar(&s, end, "|")){
 
     s++;
+    if(nextchar(&s, end, "|")){
+      s++;
+      cmd = command(cmd, fetchexeccommand(&s, end),6);
+    }
     cmd = command(cmd, fetchexeccommand(&s, end),3);
   }
   else if(nextchar(&s, end, ";")){
     s++;
     cmd = command(cmd, fetchexeccommand(&s, end), 4);
+  }
+  else if(nextchar(&s, end, "&")){
+    s++;
+    if(nextchar(&s, end, "&")){
+      s++;
+      cmd = command(cmd, fetchexeccommand(&s, end),5);
+    }
   }
   while(nextchar(&s, end, "<>")){
     cmd = buildcommand(cmd, &s, end);
@@ -253,30 +309,48 @@ buildcommand(struct cmds *cmd, char **s, char *end){
   int tok;
   char *temp1, *temp2, *val;
   val= *s;
+
+  // this will run until it cover the redirection code.
   while(nextchar(&val, end, "<>")){
+
+    //fetching the token required for finding out input or output.
     tok = *val;
     val++;
+
+
+    //clearing the whitespace unitil it reaches the command.
     while(val<end && strchr(whitespace, *val)){
       val++;
     }
     temp1=val;
+
+
+    //fetching the first command util the another space or symbol come.
     while(val<end && !strchr(whitespace, *val) && !strchr(symbols, *val))
-    val++;
+      val++;
+
+    // copy the rest part of the command which may be input file or output file.
     temp2 = val;
+
+    // remove the whitespaces
     while(val<end && strchr(whitespace, *val))
     val++;
+
+    //depends on the token that was fetched, we need to decide its read or write.
     switch(tok){
+
+      //represents the input file
       case '<':
       cmd = iocommand(cmd, temp1, temp2, O_RDONLY, 0);
       break;
+
+    //represents the output file
     case '>':
-      cmd = iocommand(cmd, temp1, temp2, O_WRONLY|O_CREATE, 1);
-      break;
-    case '+':  // >>
       cmd = iocommand(cmd, temp1, temp2, O_WRONLY|O_CREATE, 1);
       break;
     }
 
+    // copy the rest command to original string.
     *s = val;
   }
   return cmd;
@@ -294,7 +368,7 @@ fetchexeccommand(char **s, char *end){
 
   val = *s;
   int count = 0;
-  while(val <= end && !nextchar(&val, end, "<>|)&;")){
+  while(val <= end && !nextchar(&val, end, "<>|&;")){
   
   //removing first white space before the statement
   while(val<end && strchr(whitespace, *val)){
@@ -343,8 +417,7 @@ cleanvalues(struct cmds *cmd)
 {
   int i;
   struct execcommand *ecmd;
-  struct command *pcmd;
-  struct command *rcmd;
+  struct command *command;
 
   if(cmd == 0)
     return 0;
@@ -357,16 +430,18 @@ cleanvalues(struct cmds *cmd)
     break;
 
   case 2:
-    rcmd = (struct command*)cmd;
-    cleanvalues(rcmd->child1);
-    *rcmd->tempfile = 0;
+    command = (struct command*)cmd;
+    cleanvalues(command->child1);
+    *command->tempfile = 0;
     break;
 
   case 3:
   case 4:
-    pcmd = (struct command*) cmd;
-    cleanvalues(pcmd->child1);
-    cleanvalues(pcmd->child2);
+  case 5:
+  case 6:
+    command = (struct command*) cmd;
+    cleanvalues(command->child1);
+    cleanvalues(command->child2);
   }
   return cmd;
 }
