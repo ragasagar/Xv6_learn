@@ -24,9 +24,9 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int helloWorld(void);
-int numOpenFiles(void);
-int memAlloc(void);
-int getprocesstimedetails(void);
+int numOpenFiles(int);
+int memAlloc(int);
+int getprocesstimedetails(int);
 int psinfo(void);
 int procinfo(int);
 
@@ -43,3 +43,4 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
+int isdigit(const char*);
