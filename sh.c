@@ -261,6 +261,7 @@ backcmd(struct cmd *subcmd)
 
 char whitespace[] = " \t\r\n\v";
 char symbols[] = "<|>&;()";
+char *substr(char*, char*);
 
 int
 gettoken(char **ps, char *es, char **q, char **eq)
@@ -300,7 +301,6 @@ gettoken(char **ps, char *es, char **q, char **eq)
   }
   if(eq)
     *eq = s;
-
   while(s < es && strchr(whitespace, *s))
     s++;
   *ps = s;
@@ -329,7 +329,6 @@ parsecmd(char *s)
 {
   char *es;
   struct cmd *cmd;
-
   es = s + strlen(s);
   cmd = parseline(&s, es);
   printf(1, "%s", cmd);
