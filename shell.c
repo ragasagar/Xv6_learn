@@ -63,9 +63,9 @@ isValid(char *arg){
 void
 runcmd(struct execcommand *cmd)
 {
-  int pipefd[2];
-  struct execcommand *execcommand;
-  struct command *command;
+  int pipefd[2];          // used for creating two fd.
+  struct execcommand * execcommand; // atomic command
+  struct command *command;      // different type of command
   int status;
 
   if(cmd == 0)
@@ -90,7 +90,7 @@ runcmd(struct execcommand *cmd)
   // It first closes the default STDOUT file and use the one provided by the user.
   case 2:
     command = (struct command*)cmd;
-    close(command->fd);
+    close(command->fd);                 // closes the default fd.
     if(open(command->file, command->mode) < 0){
       printf(2, "open %s failed\n", command->file);
       exit(0);
@@ -223,7 +223,7 @@ main(void)
 
 struct execcommand *fetchexeccommand(char**, char*);
 struct execcommand *cleanvalues(struct execcommand*);
-struct execcommand *buildcommand(struct execcommand *, char **, char *, int tok);
+struct execcommand *buildiocommand(struct execcommand *, char **, char *, int tok);
 struct execcommand* parsecmd(char **, char *);
 
 /**
@@ -286,7 +286,7 @@ nextchar(char **ps, char *es, char *toks)
   char *s;
 
   s = *ps;
-  while(s < es && strchr(whitespace, *s))
+  while(s < es && strchr(whitespace, *s))       // removes the whitespace if available
     s++;
   *ps = s;
   return *s && strchr(toks, *s);
@@ -352,7 +352,7 @@ parsecmd(char **val, char *end){
       //this represent the i/o direction command.
       case '<':
       case '>':
-        cmd = buildcommand(cmd, &s, end, tok);
+        cmd = buildiocommand(cmd, &s, end, tok);
         break;
     }
   }
@@ -364,7 +364,7 @@ parsecmd(char **val, char *end){
 
 
 struct execcommand*
-buildcommand(struct execcommand *cmd, char **s, char *end, int tok){
+buildiocommand(struct execcommand *cmd, char **s, char *end, int tok){
   char *temp1, *temp2, *val;
   val= *s;
 
