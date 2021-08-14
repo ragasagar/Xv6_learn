@@ -1,0 +1,5 @@
+cat README
+
+cat README > hello.txt
+
+ls ; cat < README | grep xv6 > helloworld.txt

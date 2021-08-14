@@ -8,12 +8,15 @@
 #define MAXARGS 10
 char *validCommand[] = {"ls", "cat", "grep", "echo", "wc", "ps", "procinfo", "rm" , "hw", "ofiles", 
 "memalloc","processtime", "mkdir", "kill", "ln"};
+char *testCommands[10] = {
+  "\ncat README", "\n cat README > hello.txt" "\n"
+};
 
 
 //these symbols  will be considered as white spaces.
 char whitespace[] = " \t\r\n\v";
 
-//total symbol which decides the type of the command.
+//total symbol which decides the type of te command.
 char symbols[] = "<|>&;()";
 
 
@@ -36,6 +39,9 @@ struct command{
 };
 
 struct execcommand *parsecommands(char*);
+int parsefileexecifexist(char *);
+int strcmpprefix(char *, char *);
+int createtestcasefile(void);
 
 
 //This method checks the valid commands to run the program.
@@ -55,7 +61,7 @@ isValid(char *arg){
 void
 runcmd(struct execcommand *cmd)
 {
-  int p[2];
+  int pipefd[2];
   struct execcommand *execcommand;
   struct command *command;
   int status;
@@ -95,25 +101,25 @@ runcmd(struct execcommand *cmd)
     break;
 
   case 3:
-    if(pipe(p) < 0)
+    if(pipe(pipefd) < 0)
       exit(0);
     command = (struct command*)cmd;
     if(fork() == 0){
       close(1);
-      dup(p[1]);
-      close(p[0]);
-      close(p[1]);
+      dup(pipefd[1]);
+      close(pipefd[0]);
+      close(pipefd[1]);
       runcmd(command->child1);
     }
     if(fork() == 0){
       close(0);
-      dup(p[0]);
-      close(p[0]);
-      close(p[1]);
+      dup(pipefd[0]);
+      close(pipefd[0]);
+      close(pipefd[1]);
       runcmd(command->child2);
     }
-    close(p[0]);
-    close(p[1]);
+    close(pipefd[0]);
+    close(pipefd[1]);
     wait(0);
     wait(0);
     break;
@@ -165,13 +171,20 @@ main(void)
 {
   static char buf[100];
 
+  //create the input test file for question no: 7
+  createtestcasefile();
+
   // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
 
     //if no command is given just continue the shell.
     if(strlen(buf)==1 && strcmp(buf,"\n")==0)
       continue;
-
+    
+    if(strcmpprefix(buf, "executeCommands")==0){
+      parsefileexecifexist(buf);
+      continue;
+    }
     //if exit command is given exit the current shell.
     if(buf[0] == 'e' && buf[1] == 'x' && buf[2] == 'i' && buf[3] == 't'){ 
       break;
@@ -447,4 +460,90 @@ cleanvalues(struct execcommand *cmd)
     cleanvalues(command->child2);
   }
   return cmd;
+}
+
+
+int
+parsefileexecifexist(char *s){
+  char *val, *end,cc, buf[512];
+  struct execcommand *cmd;
+  int fd,n,c,i;
+  val=s;
+  end = s + strlen(s);
+
+  cmd = fetchexeccommand(&val, end);
+  cleanvalues(cmd);
+  if((fd = open(cmd->argv[1], 0)) < 0){
+      printf(1, "executeCommands: cannot open %s\n", cmd->argv[1]);
+      return 0;
+    }
+  
+  c=0;
+  for(i=0; i+1 < sizeof(buf); ){
+    if((n= read(fd, &cc, 1))>0){
+      if(cc!='\n')
+        buf[c++]= cc;
+      if(cc == '\n'  && strlen(buf)>0){
+        if(fork()==0){
+          runcmd(parsecommands(buf));
+        }
+        wait(0);
+        memset(buf, 0, strlen(buf));
+        c=0;
+      }
+    }else{
+      if(strlen(buf)>0){
+        if(fork()==0){
+          runcmd(parsecommands(buf));
+        }
+        wait(0);
+      }
+      break;
+    }
+  }
+
+  printf(1,"\n");
+  close(fd);
+  return 0;
+}
+
+int
+strcmpprefix(char *p, char *q){
+  char *val, *end;
+
+  val = p;
+  end= q+ strlen(q);
+  while(strchr(whitespace, *val)){
+    val++;
+  }
+
+  while(!strchr(whitespace, *val) && !strchr(symbols, *val)){
+    if(q<end && *val!=*q )
+      return -1;
+    val++; q++;
+  }
+
+  return 0;
+}
+
+int
+createtestcasefile(){
+  int fd, n;
+
+  if((fd = open("test", O_RDWR | O_CREATE))<0){
+    printf(1, "Unable to create test case files");
+    return -1;
+  }
+
+ char **p;
+  p = testCommands;
+  while(*p != 0){
+    n= strlen(*p);
+    if (write(fd, *p, n) != n) 
+      return -1;
+     ++p;
+  }
+
+  close(fd);
+  return 0;
 }
