@@ -251,6 +251,8 @@ exit(int status)
 
   acquire(&ptable.lock);
 
+  curproc->status = status;
+
   // Parent might be sleeping in wait(0).
   wakeup1(curproc->parent);
 
@@ -265,7 +267,6 @@ exit(int status)
 
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
-  curproc->status = status;
   sched();
   panic("zombie exit");
 }
@@ -299,9 +300,9 @@ wait(int *status)
         p->killed = 0;
         p->state = UNUSED;
         release(&ptable.lock);
+        *status = p->status;
         return pid;
       }
-      status = &p->status;
     }
 
     // No point waiting if we don't have any children.
@@ -618,7 +619,6 @@ psinfo(){
     cprintf("%s\t\t%d\t\t%s\n", p->name, p->pid, states[p->state]);
   }
 }
-
 
 
 void

@@ -125,9 +125,11 @@ runcmd(struct execcommand *cmd)
         sleep(20);
       }
       wait(&status);
-      printf(1,"status %d", status);
-      if(status == 0 && fork()==0){
-        runcmd(command->child2);
+      if(status == 0){
+        if(fork()==0){
+          runcmd(command->child2);
+        }
+        wait(0);
       }
       break;
     case 6:
@@ -136,8 +138,11 @@ runcmd(struct execcommand *cmd)
         runcmd(command->child1);
       }
       wait(&status);
-      if(status == -1 && fork()==0){
-        runcmd(command->child2);
+      if(status == -1){
+        if(fork()==0){
+          runcmd(command->child2);
+        }
+        wait(0);
       }
       break;
   }
