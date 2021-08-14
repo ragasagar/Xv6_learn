@@ -8,8 +8,10 @@
 #define MAXARGS 10
 char *validCommand[] = {"ls", "cat", "grep", "echo", "wc", "ps", "procinfo", "rm" , "hw", "ofiles", 
 "memalloc","processtime", "mkdir", "kill", "ln"};
+
+//commands to be tested while executing the file.
 char *testCommands[10] = {
-  "\ncat README", "\n cat README > hello.txt" "\n"
+  "\ncat README", "\n cat README > hello.txt" "\nls ; cat < README | wc > helloworld.txt"
 };
 
 
@@ -70,6 +72,8 @@ runcmd(struct execcommand *cmd)
     exit(0);
 
   switch(cmd->type){
+
+  //atomic exec types of command is handled.
   case 1:
     execcommand = (struct execcommand*) cmd;
     if(execcommand->argv[0] == 0)
@@ -82,6 +86,8 @@ runcmd(struct execcommand *cmd)
     break;
 
 
+  //IO redirection types of commands is handled here.
+  // It first closes the default STDOUT file and use the one provided by the user.
   case 2:
     command = (struct command*)cmd;
     close(command->fd);
@@ -92,6 +98,7 @@ runcmd(struct execcommand *cmd)
     runcmd(command->child1);
     break;
 
+  //prallel execution types  of  commands is handled here.
   case 4:
     command = (struct command*)cmd;
     if(fork() == 0)
@@ -100,19 +107,28 @@ runcmd(struct execcommand *cmd)
     runcmd(command->child2);
     break;
 
+
+// Pipe commands are handled here.
+// It first closes the default files of the process and pass the result to another.
   case 3:
     if(pipe(pipefd) < 0)
       exit(0);
     command = (struct command*)cmd;
     if(fork() == 0){
+      // closing the default output files so that our result can be pass to second child command.
       close(1);
+
+      //new output  fd.
       dup(pipefd[1]);
       close(pipefd[0]);
       close(pipefd[1]);
       runcmd(command->child1);
     }
     if(fork() == 0){
+      // closing the default input files so that it get result from child one.
       close(0);
+
+      // new input fd.
       dup(pipefd[0]);
       close(pipefd[0]);
       close(pipefd[1]);
@@ -124,11 +140,12 @@ runcmd(struct execcommand *cmd)
     wait(0);
     break;
 
+    // This handles the AND type of the command. I will run the second command only 
+    // if it receives the success message from the first command. Receives the message using wait sys call.
     case 5:
     command = (struct command*) cmd;
       if(fork()==0){
         runcmd(command->child1);
-        sleep(20);
       }
       wait(&status);
       if(status == 0){
@@ -138,6 +155,9 @@ runcmd(struct execcommand *cmd)
         wait(0);
       }
       break;
+
+    // This handles the OR type of the command. I will run the second command only 
+    // if it receives the fails message from the first command. Receives the message using wait sys call.
     case 6:
     command = (struct command*) cmd;
       if(fork()==0){
@@ -155,6 +175,7 @@ runcmd(struct execcommand *cmd)
   exit(0);
 }
 
+// this method retrieve the input from the terminal which is default STDIN fd
 int
 getcmd(char *buf, int nbuf)
 {
@@ -203,6 +224,7 @@ main(void)
 struct execcommand *fetchexeccommand(char**, char*);
 struct execcommand *cleanvalues(struct execcommand*);
 struct execcommand *buildcommand(struct execcommand *, char **, char *, int tok);
+struct execcommand* parsecmd(char **, char *);
 
 /**
  * 
@@ -246,7 +268,6 @@ struct execcommand*
 command(struct execcommand *child1, struct execcommand *child2, int type)
 {
   struct command *cmd;
-
   cmd = malloc(sizeof(*cmd));
   memset(cmd, 0, sizeof(*cmd));
   cmd->type = type;
@@ -280,13 +301,27 @@ parsecommands(char *s){
   char *end;
   struct execcommand *cmd;
   end = s + strlen(s);
+
+  cmd = parsecmd(&s, end);
+  
+  //cleaning the values which has more values than the command
+  if(s==end){
+    cleanvalues(cmd);
+  }
+  return cmd;
+}
+
+struct execcommand*
+parsecmd(char **val, char *end){
+  struct execcommand *cmd;
   int tok;
+  char *s;
+
+  s = *val;
 
   //first we try to fetch the first exec command
   cmd = fetchexeccommand(&s, end);
-
   while(s<end && s !=0){
-    
     tok = *s;
     s++;
     switch(tok){
@@ -303,7 +338,7 @@ parsecommands(char *s){
       
       // this represent the parallel command.
       case ';':
-        cmd = command(cmd, fetchexeccommand(&s, end), 4);
+        cmd = command(cmd, parsecmd(&s, end), 4);
         break;
 
       //this represent and commands
@@ -321,13 +356,10 @@ parsecommands(char *s){
         break;
     }
   }
-
-//cleaning the values which has more values than the command
-  if(s==end){
-    cleanvalues(cmd);
-  }
+  *val = s;
   return cmd;
 }
+
 
 
 
@@ -451,6 +483,8 @@ cleanvalues(struct execcommand *cmd)
     *command->tempfile = 0;
     break;
 
+
+  // Used the same process, as it have two childs.
   case 3:
   case 4:
   case 5:
@@ -463,6 +497,7 @@ cleanvalues(struct execcommand *cmd)
 }
 
 
+//parse the executable file and run the line sequentially.
 int
 parsefileexecifexist(char *s){
   char *val, *end,cc, buf[512];
@@ -473,11 +508,17 @@ parsefileexecifexist(char *s){
 
   cmd = fetchexeccommand(&val, end);
   cleanvalues(cmd);
+
+  if(cmd->argv[1]==0){
+    printf(1, "executeCommands: Missing Arguement: <fileName>\n");
+    return -1;
+  }
   if((fd = open(cmd->argv[1], 0)) < 0){
       printf(1, "executeCommands: cannot open %s\n", cmd->argv[1]);
-      return 0;
+      return -1;
     }
   
+  //Reading a file and running the individual line sequentially.
   c=0;
   for(i=0; i+1 < sizeof(buf); ){
     if((n= read(fd, &cc, 1))>0){
@@ -492,6 +533,8 @@ parsefileexecifexist(char *s){
         c=0;
       }
     }else{
+
+      // this is the last command present in the file.
       if(strlen(buf)>0){
         if(fork()==0){
           runcmd(parsecommands(buf));
@@ -507,6 +550,8 @@ parsefileexecifexist(char *s){
   return 0;
 }
 
+
+// Checks if the source string starts with given test string.
 int
 strcmpprefix(char *p, char *q){
   char *val, *end;
@@ -526,6 +571,8 @@ strcmpprefix(char *p, char *q){
   return 0;
 }
 
+
+//Creates the test sample executable file.
 int
 createtestcasefile(){
   int fd, n;
