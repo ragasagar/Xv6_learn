@@ -273,22 +273,6 @@ command(struct execcommand *child1, struct execcommand *child2, int type)
   return (struct execcommand*)cmd;
 }
 
-
-/**
- * Checks if the next char is given toks or not.
- **/
-int
-nextchar(char **ps, char *es, char *toks)
-{
-  char *s;
-
-  s = *ps;
-  while(s < es && strchr(whitespace, *s))       // removes the whitespace if available
-    s++;
-  *ps = s;
-  return *s && strchr(toks, *s);
-}
-
 /**
  * Main parser which parse the commands.
  * 
