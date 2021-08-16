@@ -108,8 +108,8 @@ runcmd(struct execcommand *cmd)
     break;
 
 
-// Pipe commands are handled here.
-// It first closes the default files of the process and pass the result to another.
+  // Pipe commands are handled here.
+  // It first closes the default files of the process and pass the result to another.
   case 3:
     if(pipe(pipefd) < 0)
       exit(0);
@@ -182,9 +182,9 @@ getcmd(char *buf, int nbuf)
   printf(2, "MyShell> ");
   memset(buf, 0, nbuf);
   gets(buf, nbuf);
-  if(buf[0] == 0)
+  if(strlen(buf)<=0)
     return -1;
-  return 0;
+  return  0;
 }
 
 int
@@ -237,7 +237,6 @@ execcmd(void)
   struct execcommand *cmd;
 
   cmd = malloc(sizeof(*cmd));
-  memset(cmd, 0, sizeof(*cmd));
   cmd->type = 1;
   return cmd;
 }
@@ -249,7 +248,6 @@ iocommand(struct execcommand *child, char *mainfile, char *tempfile, int mode, i
   struct command *cmd;
 
   cmd = malloc(sizeof(*cmd));
-  memset(cmd, 0, sizeof(*cmd));
   cmd->type = 2;
   cmd->child1 = child;
   cmd->file = mainfile;
@@ -269,7 +267,6 @@ command(struct execcommand *child1, struct execcommand *child2, int type)
 {
   struct command *cmd;
   cmd = malloc(sizeof(*cmd));
-  memset(cmd, 0, sizeof(*cmd));
   cmd->type = type;
   cmd->child1 = child1;
   cmd->child2 = child2;
@@ -327,8 +324,9 @@ parsecmd(char **val, char *end){
     switch(tok){
       // this represent pipe command.
       case '|':
+        tok = *s;
         //this represent the or command.
-        if(nextchar(&s, end, "|")){
+        if(tok == '|'){
           s++;
           cmd = command(cmd, fetchexeccommand(&s, end),6);
         }else{
@@ -343,7 +341,8 @@ parsecmd(char **val, char *end){
 
       //this represent and commands
       case '&':
-        if(nextchar(&s, end, "&")){
+        tok = *s;
+        if(tok == '&'){
           s++;
           cmd = command(cmd, fetchexeccommand(&s, end),5);
         }
@@ -418,7 +417,7 @@ fetchexeccommand(char **s, char *end){
 
   val = *s;
   int count = 0;
-  while(val <= end && !nextchar(&val, end, "<>|&;")){
+  while(val <= end && !strchr("<>|&;", *val)){
   
   //removing first white space before the statement
   while(val<end && strchr(whitespace, *val)){
