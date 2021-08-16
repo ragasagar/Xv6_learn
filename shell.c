@@ -68,7 +68,8 @@ runcmd(struct execcommand *cmd)
   struct command *command;      // different type of command
   int status;
 
-  if(cmd == 0)
+  //check if cmd is null or arguement is null.
+  if(cmd == 0  || strlen(cmd->argv[0])==0)
     exit(0);
 
   switch(cmd->type){
@@ -434,9 +435,6 @@ fetchexeccommand(char **s, char *end){
     break;
   }
   }
-  //return the remaing string to the original string.
-  cmd->argv[count]=0;
-  cmd->temp[count]=0;
 
   return cmd;
 
