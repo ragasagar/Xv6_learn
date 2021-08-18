@@ -61,7 +61,7 @@ isValid(char *arg){
 
 // execute command
 void
-runcmd(struct execcommand *cmd)
+execute(struct execcommand *cmd)
 {
   int pipefd[2];          // used for creating two fd.
   struct execcommand * execcommand; // atomic command
@@ -96,16 +96,16 @@ runcmd(struct execcommand *cmd)
       printf(2, "open %s failed\n", command->file);
       exit(0);
     }
-    runcmd(command->child1);
+    execute(command->child1);
     break;
 
   //prallel execution types  of  commands is handled here.
   case 4:
     command = (struct command*)cmd;
     if(fork() == 0)
-      runcmd(command->child1);
+      execute(command->child1);
     wait(0);
-    runcmd(command->child2);
+    execute(command->child2);
     break;
 
 
@@ -123,7 +123,7 @@ runcmd(struct execcommand *cmd)
       dup(pipefd[1]);
       close(pipefd[0]);
       close(pipefd[1]);
-      runcmd(command->child1);
+      execute(command->child1);
     }
     if(fork() == 0){
       // closing the default input files so that it get result from child one.
@@ -133,7 +133,7 @@ runcmd(struct execcommand *cmd)
       dup(pipefd[0]);
       close(pipefd[0]);
       close(pipefd[1]);
-      runcmd(command->child2);
+      execute(command->child2);
     }
     close(pipefd[0]);
     close(pipefd[1]);
@@ -146,12 +146,12 @@ runcmd(struct execcommand *cmd)
     case 5:
     command = (struct command*) cmd;
       if(fork()==0){
-        runcmd(command->child1);
+        execute(command->child1);
       }
       wait(&status);
       if(status == 0){
         if(fork()==0){
-          runcmd(command->child2);
+          execute(command->child2);
         }
         wait(0);
       }
@@ -162,12 +162,12 @@ runcmd(struct execcommand *cmd)
     case 6:
     command = (struct command*) cmd;
       if(fork()==0){
-        runcmd(command->child1);
+        execute(command->child1);
       }
       wait(&status);
       if(status == -1){
         if(fork()==0){
-          runcmd(command->child2);
+          execute(command->child2);
         }
         wait(0);
       }
@@ -214,7 +214,7 @@ main(void)
 
     //rest commands are parsed and executed using exec call.
     if(fork() == 0){
-      runcmd(parsecommands(buf));
+      execute(parsecommands(buf));
     }
     wait(0);
   }
@@ -507,7 +507,7 @@ parsefileexecifexist(char *s){
         buf[c++]= cc;
       if(cc == '\n'  && strlen(buf)>0){
         if(fork()==0){
-          runcmd(parsecommands(buf));
+          execute(parsecommands(buf));
         }
         wait(0);
         memset(buf, 0, strlen(buf));
@@ -518,7 +518,7 @@ parsefileexecifexist(char *s){
       // this is the last command present in the file.
       if(strlen(buf)>0){
         if(fork()==0){
-          runcmd(parsecommands(buf));
+          execute(parsecommands(buf));
         }
         wait(0);
       }
